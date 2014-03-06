@@ -1,0 +1,43 @@
+##### Normal model
+# prior
+mu0 <- 1.9  ; k0 <- 1
+s20 <- 0.01 ; nu0 <- 1
+
+# data
+y<-c(1.64,1.70,1.72,1.74,1.82,1.82,1.82,1.90,2.08)
+n<-length(y) ; ybar<-mean(y) ; s2<-var(y)
+
+# posterior inference
+kn<-k0+n ; nun<-nu0+n
+mun<- (k0*mu0 + n*ybar)/kn  
+s2n<- (nu0*s20 +(n-1)*s2 +k0*n*(ybar-mu0)^2/(kn))/(nun)
+mun
+s2n
+
+
+###########################################################
+# monte carlo sampling
+S<-10000
+s2.postsample<-1/rgamma(S,  (nu0+n)/2, s2n*(nu0+n)/2 )
+theta.postsample<-rnorm(S, mun, sqrt(s2.postsample/(k0+n)))
+
+## quantities of interest
+mean(theta.postsample)
+sd(theta.postsample)
+quantile(theta.postsample, c(.025,.975))
+
+
+#########################################################
+## plots of the posterior
+layout(matrix(c(1,1,2,3),2,2,byrow=T))
+
+##
+plot(theta.postsample[1:5000], s2.postsample[1:5000],pch=".", xlab=expression(theta), ylab=expression(sigma^2), xlim=c(1.65,1.95), ylim=c(.005,.07) )
+
+##
+plot(density(s2.postsample,adjust=3),main="",xlab=expression(sigma^2), xlim=c(0,.075),ylab=expression( paste(italic("p("), sigma^2,"|",italic(y[1]),"...",italic(y[n]),")",sep=""))) 
+
+##
+plot(density(theta.postsample,adjust=3),main="",xlab=expression(theta),xlim=c(1.60,2.0),ylab=expression( paste(italic("p("), theta,"|",italic(y[1]),"...",italic(y[n]),")",sep=""))) 
+
+
