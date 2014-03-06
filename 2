@@ -1,0 +1,110 @@
+
+###############################################
+## Y1, . . . , Yn ~ Poisson(theta)
+## theta ~ gamma(a,b)
+## theta|y ~ gamma(a+sum(y), b+n)
+
+a<-2  ; b<-1
+sy<-66; n<-44
+
+theta.sim10<-rgamma(10,a+sy,b+n)
+theta.sim100<-rgamma(100,a+sy,b+n)
+theta.sim1000<-rgamma(1000,a+sy,b+n)
+
+## analytical mean
+(a+sy)/(b+n) 
+
+## Monte Carlo mean
+mean(theta.sim10)
+mean(theta.sim100)
+mean(theta.sim1000)
+
+## analytical CDF
+pgamma(1.75,a+sy,b+n)
+
+## Monte Carlo CDF
+mean( theta.sim10<1.75)
+mean( theta.sim100<1.75)
+mean( theta.sim1000<1.75)
+
+## analytical 95% credible intervals
+qgamma(c(.025,.975),a+sy,b+n)
+
+## Monte Carlo 95% credible intervals
+quantile( theta.sim10, c(.025,.975))
+quantile( theta.sim100, c(.025,.975))
+quantile( theta.sim1000, c(.025,.975))
+ 
+ 
+## Plot of functions based on Monte Carlo samples
+par(mfrow=c(1,3))
+
+a<-2   ; b<-1
+sy<-66 ; n<-44
+
+nsim<-2000
+theta.sim<-rgamma(nsim,a+sy,b+n)
+
+# cumulative mean
+cmean<-cumsum(theta.sim)/(1:nsim)
+
+# cumulative cdf
+ccdf<- cumsum(theta.sim<1.75)/ (1:nsim)
+
+# cumulative 97.5th quantile
+cq<-NULL
+for(j in 1:nsim){ cq<-c(cq,quantile(theta.sim[1:j],probs=0.975)) }
+
+## 
+sseq<- seq(1, nsim, by=50)
+cmean<-cmean[sseq] 
+cq<-cq[sseq] 
+ccdf<-ccdf[sseq] 
+
+plot(sseq,cmean,type="l",xlab="# of Monte Carlo samples",ylab="cumulative mean",
+     col="black")
+abline(h= (a+sy)/(b+n),col="gray",lwd=2)
+
+plot(sseq,ccdf,type="l",xlab="# of Monte Carlo samples",ylab="cumulative cdf at 1.75",col="black")
+abline(h= pgamma(1.75,a+sy,b+n),col="gray",lwd=2)
+
+plot(sseq,cq,type="l",xlab="# of Monte Carlo samples",ylab="cumulative 97.5% quantile",col="black")
+abline(h= qgamma(.975,a+sy,b+n),col="gray",lwd=2)
+
+
+## Let's calculate P(theta1 > theta2 | y1, y2)
+a<-2 ; b<-1
+sy1<-217 ;  n1<-111
+sy2<-66  ;  n2<-44
+
+theta1.mc<-rgamma(10000,a+sy1, b+n1)
+theta2.mc<-rgamma(10000,a+sy2, b+n2)
+
+mean(theta1.mc>theta2.mc)
+
+## Now P(Y1 > Y2 | y1, y2)
+y1.mc<-rpois(10000,theta1.mc)
+y2.mc<-rpois(10000,theta2.mc)
+
+mean(y1.mc>y2.mc)
+
+
+## Posterior predictive check, t(Y) = (num of 2 chilren)/(num of 1 child).
+a<-2 ; b<-1
+sy1<-217 ;  n1<-111
+
+t.mc<-NULL
+for(s in 1:10000) {
+theta1<-rgamma(1, a+sy1, b+n1)
+y1.mc<-rpois(n1, theta1)
+t.mc<-c(t.mc, sum(y1.mc==2)/sum(y1.mc==1))
+                    }
+
+t.obs<-38/19
+mean(t.mc>=t.obs)
+
+
+par(mfrow=c(1,1))
+hist(t.mc, col="yellow")
+abline(v=t.obs)
+
