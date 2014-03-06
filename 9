@@ -1,0 +1,232 @@
+tem = read.table("globtemp2.txt",header=TRUE)
+te = ts(tem[,2])
+
+
+plot(te)
+######the mean is not a constant; not stationary
+par(mfrow=c(2,1))
+acf(te)
+pacf(te)
+#########r(0) stands out; not stationary
+
+tee = diff(te)
+plot(tee)
+######the mean seems a constant;  
+par(mfrow=c(2,1))
+acf(tee)
+pacf(tee)
+#########r(0) stands out; not stationary; or p=3, q=0
+
+
+te3 = diff(tee)
+plot(te3)
+######the mean seems a constant;  
+par(mfrow=c(2,1))
+acf(te3)
+pacf(te3)
+#########q=1, p=3 or 5
+
+
+################try to build models
+#########mod1
+mod1 = arima(te,order=c(3,2,1))
+mod1$var.coef
+shapiro.test(mod1$resid)
+tsdiag(mod1)
+
+#########mod2
+mod2 = arima(te,order=c(1,2,1))
+mod2$var.coef
+shapiro.test(mod2$resid)
+tsdiag(mod2)
+
+###########mod3
+mod3 = arima(te,order=c(3,1,0))
+mod3$var.coef
+shapiro.test(mod3$resid)
+tsdiag(mod3)
+
+###########mod4
+mod4 = arima(te,order=c(3,1,1))
+mod4$var.coef
+shapiro.test(mod4$resid)
+tsdiag(mod4)
+
+################prediction
+new10 = predict(mod1,n.ahead=10)
+new10.4 = predict(mod4,n.ahead=10)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+> mod1
+
+Call:
+arima(x = te, order = c(3, 2, 1))
+
+Coefficients:
+          ar1      ar2      ar3      ma1
+      -0.4417  -0.4491  -0.3241  -0.9887
+s.e.   0.0865   0.0861   0.0880   0.0404
+
+sigma^2 estimated as 0.01688:  log likelihood = 72.91,  aic = -135.82
+
+
+> shapiro.test(mod1$resid)
+
+        Shapiro-Wilk normality test
+
+data:  mod1$resid 
+W = 0.9929, p-value = 0.7855
+
+> mod1$var.coef
+              ar1           ar2           ar3           ma1
+ar1  0.0074873503  0.0027042374  0.0026795561 -0.0005003821
+ar2  0.0027042374  0.0074217635  0.0027131476 -0.0005027395
+ar3  0.0026795561  0.0027131476  0.0077366745 -0.0003724323
+ma1 -0.0005003821 -0.0005027395 -0.0003724323  0.0016346070
+
+
+
+> mod2$var.coef
+              ar1           ma1
+ar1  7.701057e-03 -4.335221e-09
+ma1 -4.335221e-09  5.823056e-04
+> shapiro.test(mod2$resid)
+
+        Shapiro-Wilk normality test
+
+data:  mod2$resid 
+W = 0.989, p-value = 0.4276
+
+> mod2
+
+Call:
+arima(x = te, order = c(1, 2, 1))
+
+Coefficients:
+          ar1      ma1
+      -0.2436  -1.0000
+s.e.   0.0878   0.0241
+
+sigma^2 estimated as 0.02124:  log likelihood = 59.2,  aic = -112.4
+
+
+
+
+> mod3$var.coef
+            ar1         ar2         ar3
+ar1 0.007290816 0.002476563 0.002487972
+ar2 0.002476563 0.007220648 0.002519726
+ar3 0.002487972 0.002519726 0.007595223
+> shapiro.test(mod3$resid)
+
+        Shapiro-Wilk normality test
+
+data:  mod3$resid 
+W = 0.9909, p-value = 0.5921
+> mod3
+
+Call:
+arima(x = te, order = c(3, 1, 0))
+
+Coefficients:
+          ar1      ar2      ar3
+      -0.4376  -0.4447  -0.3191
+s.e.   0.0854   0.0850   0.0872
+
+sigma^2 estimated as 0.01678:  log likelihood = 76.53,  aic = -145.06
+
+
+> shapiro.test(mod4$resid)
+
+        Shapiro-Wilk normality test
+
+data:  mod4$resid 
+W = 0.9936, p-value = 0.8497
+
+> tsdiag(mod4)
+> mod4
+
+Call:
+arima(x = te, order = c(3, 1, 1))
+
+Coefficients:
+         ar1      ar2      ar3      ma1
+      0.0765  -0.2668  -0.1206  -0.5677
+s.e.  0.1968   0.1087   0.1280   0.1845
+
+sigma^2 estimated as 0.01654:  log likelihood = 77.39,  aic = -144.78
+
+
+
+> new10
+$pred
+Time Series:
+Start = 125 
+End = 134 
+Frequency = 1 
+ [1] 0.6170051 0.6673124 0.6748099 0.6613056 0.6655106 0.6851984 0.6969008
+ [8] 0.6994381 0.7045921 0.7152941
+
+$se
+Time Series:
+Start = 125 
+End = 134 
+Frequency = 1 
+ [1] 0.1300082 0.1497147 0.1555333 0.1608167 0.1776964 0.1920611 0.2013765
+ [8] 0.2094509 0.2198930 0.2306989
+
+> new10.4
+$pred
+Time Series:
+Start = 125 
+End = 134 
+Frequency = 1 
+ [1] 0.5643359 0.5824417 0.6005796 0.6014386 0.5944809 0.5915315 0.5930586
+ [8] 0.5948017 0.5948833 0.5942403
+
+$se
+Time Series:
+Start = 125 
+End = 134 
+Frequency = 1 
+ [1] 0.1285936 0.1442812 0.1466564 0.1487110 0.1546841 0.1622913 0.1684195
+ [8] 0.1732908 0.1780241 0.1830026
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
