@@ -1,0 +1,416 @@
+## functions
+### log of a mmultivariate normal density
+ldmvnorm<-function(y,mu,Sig){  # log mvn density
+	out <- c( -(length(mu)/2)*log(2*pi) -.5*determinant(Sig,log=TRUE)$mod -.5*t(y-mu)%*%solve(Sig)%*%(y-mu)   )  
+}
+
+
+## load data
+fdat<-read.table("fem.sparrow.dat",header=TRUE)
+y <- fdat$fledged 
+age <- fdat$age
+
+
+## EDA
+
+plot(y~as.factor(age), range=0, xlab="age", ylab="offspring", col="yellow")
+
+
+## model fit for poisson regression
+summary(glm(y ~ age + I(age^2), family="poisson"))
+
+
+
+## discrete grid
+p<-3
+gs<-100
+LPB<-array(0,dim=rep(gs,p))
+
+## prior
+beta0 <- rep(0,p)
+S0 <- diag(rep(100,3))
+
+
+## grid points
+
+
+
+beta1<-seq(.27-4*0.44219,.27+4*0.44219,length=gs)
+beta2<-seq(.68-4*0.33850,.68+4*0.33850,length=gs)
+beta3<-seq(-.13-4*0.05786,-.13+4*0.05786,length=gs)
+
+
+for(i in 1:gs) { for(j in 1:gs) { for(k in 1:gs) {
+  theta<-beta1[i]+beta2[j]*age+beta3[k]*age^2
+	LPB[i,j,k] <-   sum(dpois(y, exp(theta), log=TRUE)) + ldmvnorm(c(beta1[i], beta2[j], beta3[k]), beta0, S0)
+}}
+cat(i,"\n") }
+
+
+
+PB<-exp(LPB)
+PB<-PB/sum(PB)
+
+
+PB1<-apply(PB,1,sum)
+PB2<-apply(PB,2,sum)
+PB3<-apply(PB,3,sum)
+PB23<-apply(PB,c(2,3),sum)
+
+par(mfrow=c(1,3))
+plot(beta2, PB2 ,type="l",xlab=expression(beta[2]),ylab=expression(paste(italic("p("),beta[2],"|",italic("y)"),sep="") ) )
+plot(beta3, PB3,type="l",xlab=expression(beta[3]),ylab=expression(paste(italic("p("),beta[3],"|",italic("y)"),sep="") ))
+contour(beta2, beta3, PB23) 
+
+
+
+# MH algorithm for one-sample normal problem with 
+# known variance
+
+s2<-1 
+t2<-10 ; mu<-5
+
+set.seed(1)
+n<-5
+y<-round(rnorm(n,10,1),2)
+
+mu.n<-( mean(y)*n/s2 + mu/t2 )/( n/s2+1/t2) 
+t2.n<-1/(n/s2+1/t2)
+
+
+#####
+s2<-1 ; t2<-10 ; mu<-5 
+y<-c(9.37, 10.18, 9.16, 11.60, 10.33)
+theta<-0 ; delta<-2 ; S<-10000 ; THETA<-NULL ; set.seed(1)
+
+for(s in 1:S)
+{
+	
+	theta.star<-rnorm(1,theta,sqrt(delta))
+	
+	log.r <- (sum(dnorm(y, theta.star, sqrt(s2),log=TRUE)) + dnorm(theta.star, mu, sqrt(t2), log=TRUE))  -
+	         (sum(dnorm(y,theta,sqrt(s2),log=TRUE)) + dnorm(theta,mu,sqrt(t2),log=TRUE)) 
+	
+	if(log(runif(1))<log.r) { theta<-theta.star }
+	
+	THETA<-c(THETA,theta)
+	
+}
+#####
+par(mfrow=c(1,2))
+
+skeep<-seq(10,S,by=10)
+plot(skeep,THETA[skeep],type="l",xlab="iteration",ylab=expression(theta))
+
+hist(THETA[-(1:50)],prob=TRUE,main="",xlab=expression(theta),ylab="density")
+th<-seq(min(THETA),max(THETA),length=100)
+lines(th,dnorm(th,mu.n,sqrt(t2.n)) )
+
+
+#######################################
+## Back to the birds
+
+## function
+rmvnorm<-
+function(n,mu,Sigma) {
+	p<-length(mu)
+	res<-matrix(0,nrow=n,ncol=p)
+	if( n>0 & p>0 ) {
+		E<-matrix(rnorm(n*p),n,p)
+		res<-t(  t(E%*%chol(Sigma)) +c(mu))
+	}
+	res
+}
+
+
+
+## load data
+fdat<-read.table("fem.sparrow.dat",header=TRUE)
+y <- fdat$fledged 
+age <- fdat$age
+
+
+fit.mle <- glm(y ~ age + I(age^2),family="poisson")
+summary(fit.mle)
+
+X <- cbind(rep(1,length(y)),age,age^2)
+n<-length(y) 
+p<-dim(X)[2]
+
+
+## priors
+pmn.beta <- rep(0,p)
+psd.beta <- rep(10,p)
+
+
+## proposal variance
+var.prop <- var(log(y+1/2))*solve( t(X)%*%X )
+
+## starting value
+beta <- rep(0,p)
+
+
+## 
+S<-10000
+
+## storage
+BETA <- matrix(0,nrow=S,ncol=p)
+
+## acceptance rate
+ac <- 0
+
+## set seed to get the random numbers every time
+set.seed(1)
+
+for(s in 1:S) {
+	print(s)
+	
+#propose a new beta
+	
+	beta.p<- t(rmvnorm(1, beta, var.prop ))
+	
+	lhr <- sum(dpois(y, exp(X%*%beta.p), log=T)) + sum(dnorm(beta.p, pmn.beta, psd.beta, log=T)) -
+		 sum(dpois(y, exp(X%*%beta),log=T))  - sum(dnorm(beta, pmn.beta, psd.beta, log=T))
+	
+	if( log(runif(1))< lhr ) { beta<-beta.p ; ac<-ac+1 }
+	
+	BETA[s,]<-beta
+}
+cat(ac/S,"\n")
+
+#######
+
+library(coda)
+apply(BETA, 2, effectiveSize)
+
+par(mfrow=c(2,2))
+for(i in 1:3){
+plot(BETA[,i], type="l")	
+}
+
+
+
+##########################################################
+##########################################################
+##########################################################
+##########################################################
+##########################################################
+##########################################################
+## AR1 Model
+rm(list = ls())
+
+## load in libraries
+library(mvtnorm)
+library(coda)
+
+##
+tr <- function(X){
+out <- sum(diag(X))
+	return(out)
+}
+
+## load data
+dct <- read.table("dct.dat")
+
+
+
+## EDA
+summary(dct)
+
+par(mfrow=c(1,2))
+plot(dct[,2], dct[,3],xlab=expression(paste(CO[2],"(ppmv)")),ylab="temperature difference (deg C)")
+
+plot(dct[,1],  (dct[,3]-mean(dct[,3]))/sd(dct[,3]) , type="l",col="black", xlab="year",ylab="standardized measurement",ylim=c(-2.5,3))
+legend(-115000,3.2,legend=c("temp",expression(CO[2])), bty="n", lwd=c(2,2), col=c("black","blue"))
+lines(dct[,1],  (dct[,2]-mean(dct[,2]))/sd(dct[,2]),type="l",col="blue")
+
+
+## Standard regression fit and CDA
+lmfit<-lm(dct$tmp~dct$co2)
+
+par(mfrow=c(1,2))
+hist(lmfit$res,main="", xlab="residual", ylab="frequency", col="yellow")
+acf(lmfit$res, ci.col="blue", xlab="lag")
+
+
+## Set-up Bayesian computation
+######## starting values
+n<-dim(dct)[1]
+y<-dct[,3]
+X<-cbind(rep(1,n),dct[,2])
+DY<-abs(outer( (1:n),(1:n) ,"-"))
+
+lmfit <- lm(y~-1+X)
+fit.gls <- gls(y~X[,2], correlation=corARMA(p=1), method="ML")
+beta <- lmfit$coef
+s2 <- summary(lmfit)$sigma^2
+rho <- acf(lmfit$res,plot=FALSE)$acf[2]
+Cor<-rho^DY
+iCor<-solve(Cor)
+
+## priors
+nu0<-1 ; s20<-1; S0<-diag(1000,nrow=2)
+
+
+### sampling
+set.seed(1)
+S<- 1000
+odens<-S/1000
+n.store <-S/odens 
+
+OUT<-NULL
+ac<-0 
+for(s in 1:S){
+	
+## update beta
+	V.beta<- solve(t(X)%*%iCor%*%X/s2 + solve(S0))
+	E.beta<- V.beta%*%(t(X)%*%iCor%*%y/s2)
+	beta<-t(rmvnorm(1,E.beta,V.beta))
+	
+	
+## update sigma.sq	
+	s2 <- 1/rgamma(1, (nu0+n)/2, (nu0*s20 + t(y-X%*%beta)%*%iCor%*%(y-X%*%beta))/2)
+	
+## update rho	
+	rho.p<-abs(runif(1, rho - 0.1,rho + 0.1))
+	
+	## refelcting proposal
+	rho.p <- min(rho.p, 2 - rho.p)
+	Cor.p <- rho.p^DY
+	
+	
+## log metropolis ratio - use the mvtnorm library since numerically is stable
+	lr <- dmvnorm(y, X%*%beta, s2*Cor.p, log=T) + dunif(rho.p, 0, 1, log=T) -
+			dmvnorm(y, X%*%beta, s2*Cor, log=T) - dunif(rho, 0, 1, log=T)
+	
+## log of metropolis ratio --- writing out and simplifying the math
+#lr<- -.5*( determinant(rho.p^DY,log=TRUE)$mod - determinant(rho^DY,log=TRUE)$mod  + tr( (y-X%*%beta)%*%t(y-X%*%beta)%*%(solve(rho.p^DY) - solve(rho^DY)) )/s2 )
+	
+
+	
+	if( log(runif(1)) < lr ) { 
+	rho <- rho.p
+	Cor<-rho^DY
+	iCor<-solve(Cor)
+	ac<-ac+1 }
+	
+	
+## store values	
+	if(s%%odens==0){
+		cat(s, ac/s, beta, s2, rho,"\n"); OUT<-rbind(OUT,c(beta, s2, rho))
+    }
+}
+
+
+
+
+## chain diagnostics
+par(mfrow=c(2,2))
+plot(OUT[,1], type="l", lwd=2) 
+plot(OUT[,2], type="l", lwd=2) 
+plot(OUT[,3], type="l", lwd=2) 
+plot(OUT[,4], type="l", lwd=2) 
+
+## check effective sample size
+effectiveSize(OUT)
+
+
+## CDA
+## posterior predictive check using the sample acf
+Test.stat <- matrix(0, nrow=n.store, ncol=20)
+
+for(s in 1:n.store){
+	Test.stat[s,] <- c(acf(t(rmvnorm(1, X%*%OUT[s, c(1:2)], OUT[s,3]*OUT[s,4]^DY)), plot=F)[[1]])[1:20]	
+}
+
+## plot results
+par(mfrow=c(1,1))
+qu.acf <- apply(Test.stat, 2, quantile, c(0.025, 0.5, 0.975))
+plot(1:20, qu.acf[2,], ylim=c(-0.5, 1), pch=16, main="Posterior Predictive Test", ylab="acf", xlab="lag")
+segments(1:20, qu.acf[1,], 1:20, qu.acf[3,], col="blue", lwd=2)
+abline(h=0, lty=2, lwd=2)
+
+
+test.obs <-c(acf(y, plot=F)[[1]])[1:20]	
+points(1:20, test.obs, col="red", pch=16)
+
+
+
+####################################################
+###################################################
+rm(list = ls())
+
+## load in libraries
+library(mvtnorm)
+library(coda)
+
+## data
+data <- read.table("msparrownest.txt", header=T)
+y <- data[,1]
+n <- length(y)
+X <- cbind(rep(1, n), data[,2])
+
+## inverse logit function
+ilogit <- function(eta){
+	out <- exp(eta)/(1+exp(eta))
+	return(out)
+}
+
+
+### priors
+beta.0 <- rep(0,2)
+Sigma.0 <- 100*diag(1,2)
+
+## starting values
+
+mod <- glm(y~-1+X, family=binomial(link = "logit"))
+
+beta <- mod$coef
+eta <- X%*%beta
+theta <- ilogit(eta)
+
+
+## storage
+BETA <- NULL
+
+## window
+delta <- 6
+
+## acceptance
+ac <- 0
+
+
+
+## Metropolis
+S <- 1000
+
+for(s in 1:S){
+	
+## update beta
+	beta.p <- t(rmvnorm(1, beta, delta^2*var(y)*solve((t(X)%*%X))))
+	eta.p <- X%*%beta.p
+	theta.p <- ilogit(eta.p)
+	
+	
+	lr <- sum(dbinom(y, 1, prob=theta.p, log = T)) + dmvnorm(t(beta.p), beta.0, Sigma.0, log=T) - 
+	sum(dbinom(y, 1, prob=theta, log = T)) - dmvnorm(t(beta), beta.0, Sigma.0, log=T)
+	
+	
+	if(log(runif(1)) < lr){ 
+		
+		beta <- beta.p
+		eta <- eta.p
+		theta <- theta.p
+		
+		ac <- ac+1
+	}
+	
+	
+	BETA <- rbind(BETA, t(beta))
+}
+
+
+
+
+
+
