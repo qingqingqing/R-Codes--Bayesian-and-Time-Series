@@ -1,0 +1,28 @@
+###### Binomial model
+
+a<-1  ; b<-1   #prior
+n<-10 ; y<-2   #data
+
+qbeta( c(.025,.975), a+y,b+n-y)
+
+
+## the 95% HPD region is an interval from 0.04 to 0.48.  Check that this is indeed aproximately 95%. 
+
+###### Possion model for women in two different education groups
+
+a<-2 ; b<-1          # prior parameters
+n1<-111 ; s1<-217    # data in group 1
+n2<-44  ; s2<-66     # data in group 2
+
+
+## group 1
+(a+s1)/(b+n1)        # posterior mean 
+(a+s1-1)/(b+n1)      # posterior mode
+qgamma( c(.025,.975),a+s1,b+n1)   # posterior 95% CI
+
+
+## group 2
+(a+s2)/(b+n2)		# posterior mean 
+(a+s2-1)/(b+n2)		# posterior mode 
+qgamma( c(.025,.975),a+s2,b+n2)	 # posterior 95% CI
+
